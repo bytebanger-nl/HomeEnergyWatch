@@ -1,0 +1,167 @@
+name: CI
+
+on:
+  push:
+    # every branch, but not the release tags the release job below makes;
+    # with only tags-ignore, GitHub would skip branch pushes altogether
+    branches: ["**"]
+    tags-ignore: ["**"]
+  pull_request:
+  schedule:
+    - cron: "17 5 * * 1" # weekly, so newly published vulnerabilities show up
+
+permissions:
+  contents: read
+
+env:
+  # Latest patch release of the Go line the Dockerfile builds with, so tests,
+  # release builds and the image use the same toolchain and get the
+  # standard library's security fixes. go.mod states the minimum (1.26).
+  GO_VERSION: "1.27.x"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+      - name: Verify dependencies
+        run: go mod verify
+      - name: Format
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - name: Vet
+        run: go vet ./...
+      - name: Vet (Windows-only code)
+        run: GOOS=windows go vet ./...
+      - name: Test
+        run: go test ./...
+      - name: Test (race detector)
+        run: go test -race ./...
+      - name: Check JavaScript syntax
+        run: for f in web/static/*.js; do node --check "$f"; done
+
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+      # fails only on vulnerabilities in code that is actually called;
+      # the full list is printed for review either way
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+  # The version of this build (scripts/version.sh): 0.1.N on the default
+  # branch, where every merged pull request adds one; 0.1.N-dev.<sha> on
+  # branches and pull requests.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the version counts commits
+      - id: v
+        env:
+          MAIN_REF: origin/${{ github.event.repository.default_branch }}
+          RELEASE: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && '1' || '' }}
+        run: |
+          v=$(bash scripts/version.sh)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "release=$([ "$RELEASE" = 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "### Version $v" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: [test, version]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: linux, goarch: arm, goarm: "7" }
+          - { goos: windows, goarch: amd64, ext: .exe }
+          - { goos: darwin, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: "0"
+          VERSION: ${{ needs.version.outputs.version }}
+        run: go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o dist/hwlocal-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/hwlocal
+      - uses: actions/upload-artifact@v7
+        with:
+          name: hwlocal-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/
+
+  windows-installer:
+    needs: [test, version]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+      - name: Build installer
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: ./installer/build.ps1 -Version $env:VERSION
+      - uses: actions/upload-artifact@v7
+        with:
+          name: hwlocal-windows-installer
+          path: dist/hwlocal-setup-*.exe
+
+  docker:
+    needs: [test, version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # build only: nothing is pushed or deployed
+      - name: Build image
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: docker build --build-arg VERSION="$VERSION" -t hwlocal:ci .
+
+  # Every push to the default branch (a merged pull request) becomes a
+  # GitHub release v0.1.N with the installer and the binaries.
+  release:
+    needs: [version, build, windows-installer, docker]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: out
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          ls -l out
+          gh release create "v$VERSION" out/* --target "$GITHUB_SHA" --title "hwlocal v$VERSION" --generate-notes

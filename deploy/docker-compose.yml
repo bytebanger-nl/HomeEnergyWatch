@@ -1,0 +1,19 @@
+# Docker Compose for a NAS or server.
+# network_mode: host is needed so the gateway can find devices via mDNS.
+services:
+  hwlocal:
+    build: ..
+    image: hwlocal
+    container_name: hwlocal
+    restart: unless-stopped
+    network_mode: host
+    user: "1000:1000"          # owner of ./data
+    volumes:
+      - ./data:/data
+    environment:
+      HWLOCAL_INTERVAL: 2s
+      # HTTPS with your own domain (see README):
+      # HWLOCAL_DOMAIN: energie.example.nl
+      # HWLOCAL_ACME_EMAIL: you@example.nl
+      # CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      # HWLOCAL_HTTPS_ADDR: ":443"

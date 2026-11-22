@@ -1,0 +1,20 @@
+# Build output
+/bin/
+/dist/
+*.exe
+
+# Local runtime data (database, tokens, certificates)
+/data/
+
+# Editors and operating systems
+.vs/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local secrets
+.env
+.env.*
+!.env.example
+.claude/settings.local.json

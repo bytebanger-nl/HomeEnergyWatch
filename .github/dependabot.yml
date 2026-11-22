@@ -1,0 +1,22 @@
+# Dependabot opens pull requests for updates; nothing is merged
+# automatically. Each update gets the local checks (CLAUDE.md) and review.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      golang-x:
+        patterns: ["golang.org/x/*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Home Energy Watch</title>
+  <meta name="description" content="Realtime inzicht in je energie, rechtstreeks uit je eigen netwerk. Werkt met HomeWizard Energy-apparaten.">
+  <meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Energy Watch">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/errors.js"></script>
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="/icons/icon.svg" alt="" width="28" height="28">
+      <span>Home Energy Watch</span>
+    </div>
+    <div class="topbar-right">
+      <a id="inbox" class="inbox-icon" href="#/berichten" hidden>
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Z"/></svg>
+        <span class="inbox-count">0</span>
+      </a>
+      <div id="conn" class="conn" role="status" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span><span class="conn-text">Verbinden…</span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Weergave">
+    <div class="tabs-row">
+      <a href="#/dashboard" data-route="dashboard">Dashboard</a>
+      <a href="#/verbruik" data-route="verbruik">Verbruik en Kosten</a>
+      <a href="#/meldingen" data-route="meldingen">Meldingen</a>
+      <a href="#/automatisering" data-route="automatisering">Automatisering</a>
+      <a href="#/apparaten" data-route="apparaten">Apparaten</a>
+      <a href="#/klimaat" data-route="klimaat" hidden>Klimaat Plugins</a>
+      <a href="#/instellingen" data-route="instellingen">Instellingen</a>
+    </div>
+  </nav>
+
+  <main id="view" tabindex="-1">
+    <noscript><p class="notice">Deze app heeft JavaScript nodig.</p></noscript>
+  </main>
+
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+</body>
+</html>
